@@ -4,7 +4,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.mysql.cj.protocol.Resultset;
 import com.mysql.cj.xdevapi.DbDoc;
@@ -49,8 +52,8 @@ public class SellerDaoJDBC implements SellerDao {
 		try {
 			var strSql = "SELECT S.*, D.NAME AS DEPNAME "+
 				         "  FROM SELLER S "+ 
-				         "  INNER JOIN DEPARTMENT D ON D.ID = S.DEPARTMENTID "+
-				         "  WHERE S.ID = ? ";
+				         " INNER JOIN DEPARTMENT D ON D.ID = S.DEPARTMENTID "+
+				         " WHERE S.ID = ? ";
 			st = conn.prepareStatement(strSql);
 			st.setInt(1, id);
 			rs = st.executeQuery();
@@ -92,13 +95,54 @@ public class SellerDaoJDBC implements SellerDao {
 		return null;
 	}
 	
+	@Override
+	public List<Seller> findByDepartment(Department department) {
+		PreparedStatement st = null;
+		ResultSet rs = null;
+		
+		try {
+			var strSql = "SELECT S.*, D.NAME AS DEPNAME "+
+				         "  FROM SELLER S "+ 
+				         " INNER JOIN DEPARTMENT D ON D.ID = S.DEPARTMENTID "+
+				         " WHERE D.DEPARTMENTID = ? "+
+				         " ORDER BY Name ";
+			
+			st = conn.prepareStatement(strSql);
+			st.setInt(1, department.getId());
+			rs = st.executeQuery();
+			
+			List<Seller> listSeller = new ArrayList<>();
+			Map<Integer, Department> map = new HashMap<>();
+			
+			while (rs.next()) {				
+				var depto = map.get(rs.getInt("DepartmentId"));
+				
+				if(depto == null) {
+					depto = instantiateDepartment(rs);
+					map.put(rs.getInt("DepartmentId"), depto);
+				}
+				
+				// pode passar o department que está sendo passado como parametro no próprio método
+				Seller seller = instantiateSeller(rs, depto);
+				listSeller.add(seller);
+			}			
+			return listSeller;
+			
+		} catch (SQLException e) {
+			throw new DbException(e.getMessage());
+		} finally {
+			DB.closeStatement(st);
+			DB.closeResultSet(rs);
+		}
+	}
+	
 	private Department instantiateDepartment(ResultSet rs) throws SQLException {
 		var dep = new Department();
 		dep.setId(rs.getInt("DepartmentId"));
 		dep.setName(rs.getString("DepName"));		
 		return dep;
 	}
-	
+
 	private Seller instantiateSeller(ResultSet rs, Department dep) throws SQLException {
 		var seller = new Seller();
 		seller.setId(rs.getInt("Id"));
@@ -109,5 +153,7 @@ public class SellerDaoJDBC implements SellerDao {
 		seller.setDepartment(dep);
 		return seller;
 	}
+
+
 
 }
